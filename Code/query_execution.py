@@ -22,6 +22,10 @@ def get_qrel_docs(query_id, qrel="/Users/ellataira/Desktop/is4200/homework--6-el
         for line in opened.readlines():
             split_line = line.split()
             qID, docID, score = int(split_line[0]), split_line[2], float(split_line[3])
+
+            if docID == "AP890327-0078":
+                print("found in get_qrel_docs", query_id)
+
             if qID == int(query_id):
                 docs.append(docID.decode())
     opened.close()
@@ -184,10 +188,8 @@ def get_total_docs():
 # sorts documents in descending order, so the doc with the highest score is first (most relevant)
 # and truncates at k docs
 def sort_descending(relevant_docs, k):
-    print("pre sort: " + str(relevant_docs))
     sorted_docs = sorted(relevant_docs.items(), key=lambda item: float(item[1]), reverse=True)
     del sorted_docs[k:]
-    print("sorted desc: " + str(sorted_docs))
     return sorted_docs
 
 
@@ -233,6 +235,8 @@ def save_to_file(relevant_docs, filename):
             sorted_dict = sort_descending(results_dict, k)
             count = 1
             for d_id, score in sorted_dict:
+                if d_id == "AP890327-0078":
+                    print("YES", query_id)
                 f.write(str(query_id) + ' Q0 ' + str(d_id) + ' ' + str(count) + ' ' + str(score) + ' Exp\n')
                 count += 1
 
@@ -369,7 +373,7 @@ def Vector_Prob_Models(queries):
     for id, query in queries.items():
         q_id = id
         print("q_id: " + str(q_id))
-        print("query: " + str(query))
+        # print("query: " + str(query))
 
         # for each query, instaniate its index in 2-d solution array
         okapi_scores[q_id] = {}
@@ -379,12 +383,17 @@ def Vector_Prob_Models(queries):
         # get relevant documents for the query
         # doc_ids = query_search(id, query)
         doc_ids = query_search(id, query, from_qrel=True)
-        sys.exit()
+
+        if "AP890327-0078" in doc_ids:
+            print("found in docids in vector model", q_id)
 
         d = get_total_docs()
         v = get_vocab_size()
 
         for d_id in doc_ids:
+            if d_id == "AP890327-0078":
+                print("HERE", q_id)
+
             tv = get_term_vector(d_id)
 
             # for each term in query,
@@ -392,34 +401,38 @@ def Vector_Prob_Models(queries):
                 d_id = tv['_id']
 
                 # only calculate score if the term is in the document
-            if term in tv["term_vectors"]["text"]["terms"].keys():
-                tf_wq = get_word_in_query_frequency(term, query)
-                tf_wd = get_word_in_doc_frequency(term, tv)
-                dl = get_doc_length(d_id, term)
-                adl = get_avg_doc_length(tv)
-                df_w = get_doc_frequency_of_word(tv, term)
-
-                # okapi-tf
-                okapi_score = okapi_tf(tf_wd, dl, adl)
                 try:
-                    okapi_scores[q_id][d_id] += okapi_score
-                except (KeyError):
-                    okapi_scores[q_id][d_id] = okapi_score
+                    if term in tv["term_vectors"]["text"]["terms"].keys():
+                        tf_wq = get_word_in_query_frequency(term, query)
+                        tf_wd = get_word_in_doc_frequency(term, tv)
+                        dl = get_doc_length(d_id, term)
+                        adl = get_avg_doc_length(tv)
+                        df_w = get_doc_frequency_of_word(tv, term)
 
-                # TF-IDF
-                tf_idf_score = tf_idf(okapi_score, d, df_w)
-                try:
-                    tf_idf_scores[q_id][d_id] += tf_idf_score
-                except (KeyError):
-                    tf_idf_scores[q_id][d_id] = tf_idf_score
+                        # okapi-tf
+                        okapi_score = okapi_tf(tf_wd, dl, adl)
+                        try:
+                            okapi_scores[q_id][d_id] += okapi_score
+                        except (KeyError):
+                            okapi_scores[q_id][d_id] = okapi_score
 
-                # Okapi BM25
-                okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
-                try:
-                    okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
-                except (KeyError):
-                    okapi_bm25_scores[q_id][d_id] = okapi_bm25_score
+                        # TF-IDF
+                        tf_idf_score = tf_idf(okapi_score, d, df_w)
+                        try:
+                            tf_idf_scores[q_id][d_id] += tf_idf_score
+                        except (KeyError):
+                            tf_idf_scores[q_id][d_id] = tf_idf_score
 
+                        # Okapi BM25
+                        okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
+                        try:
+                            okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
+                        except (KeyError):
+                            okapi_bm25_scores[q_id][d_id] = okapi_bm25_score
+                except:
+                    okapi_scores[q_id][d_id] = 0
+                    tf_idf_scores[q_id][d_id] = 0
+                    okapi_bm25_scores[q_id][d_id] = 0
 
     return okapi_scores, tf_idf_scores, okapi_bm25_scores
 
@@ -432,7 +445,7 @@ def Unigram_Models(queries):
     for id, query in queries.items():
         q_id = id
         print("q_id: " + str(q_id))
-        print("query: " + str(query))
+        # print("query: " + str(query))
 
         # for each query, instaniate its index in 2-d solution array
         laplace_scores[q_id] = {}
@@ -491,7 +504,7 @@ def run_all_models():
 
     save_to_file(okapi_bm25_scores, "okapi_bm25")
     print("saved okapi bm25 scores")
-    #
+
     # # ES builtin:
     # # es_builtin_scores = es_search(queries)
     # es_builtin_scores = es_search(queries, from_qrel=True)
