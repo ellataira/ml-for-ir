@@ -1,5 +1,7 @@
 import math
 import os
+import sys
+
 from nltk.stem.porter import *
 
 from elasticsearch7 import Elasticsearch
@@ -11,6 +13,19 @@ q_data = "/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/new_queries
 VOCAB_SIZE = 288141
 TOTAL_DOCS = 84678
 SIZE = 2000
+
+########################### NEW FUNCTIONS FOR HW6 ########################################################
+
+def get_qrel_docs(query_id, qrel="/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/qrels.adhoc.51-100.AP89.txt"):
+    docs = []
+    with open(qrel, 'rb') as opened:
+        for line in opened.readlines():
+            split_line = line.split()
+            qID, docID, score = int(split_line[0]), split_line[2], float(split_line[3])
+            if qID == int(query_id):
+                docs.append(docID.decode())
+    opened.close()
+    return docs
 
 
 ######################## PROCESS QUERIES ##################################################################
@@ -28,8 +43,8 @@ def query_analyzer(query):
 
 
 # anaylzes .txt files of queries and stores them as key-value: qID, query terms (modified)
-def process_all_queries(query_file):
-    with open(q_data, encoding="ISO-8859-1") as opened:
+def process_all_queries(file=q_data):
+    with open(file, encoding="ISO-8859-1") as opened:
         lines = opened.readlines()
 
         query_dict = {}
@@ -49,34 +64,40 @@ def process_all_queries(query_file):
 # search index for a given query
 # @param processed query (stemmed with removed stop words in array format)
 # @return list of relevant docs IDs
-def query_search(query):
-    relevant_doc_ids = []
+def query_search(id, query, from_qrel=False):
 
-    res = es.search(
-        index=AP89_INDEX,
-        body={
-            "size": 10000,
-            "query": {
-                "match": {"text": " ".join(query)}  # convert query array back into string
-            }
-        },
-        scroll="3m"
-    )
+    if from_qrel: # update to allow for specific docids from qrel for hw6
+        relevant_doc_ids = get_qrel_docs(id)
 
-    sid = res['_scroll_id']
-    scroll_size = len(res['hits']['total'])
+    else:
 
-    for r in res['hits']['hits']:
-        relevant_doc_ids.append(r['_id'])
+        relevant_doc_ids = []
 
-    while (scroll_size > 0):
-        res = es.scroll(scroll_id=sid, scroll='3m')
-        # update scroll id
+        res = es.search(
+            index=AP89_INDEX,
+            body={
+                "size": 10000,
+                "query": {
+                    "match": {"text": " ".join(query)}  # convert query array back into string
+                }
+            },
+            scroll="3m"
+        )
+
         sid = res['_scroll_id']
-        # get number of hits from prev scroll
-        scroll_size = len(res['hits']['hits'])
+        scroll_size = len(res['hits']['total'])
+
         for r in res['hits']['hits']:
             relevant_doc_ids.append(r['_id'])
+
+        while (scroll_size > 0):
+            res = es.scroll(scroll_id=sid, scroll='3m')
+            # update scroll id
+            sid = res['_scroll_id']
+            # get number of hits from prev scroll
+            scroll_size = len(res['hits']['hits'])
+            for r in res['hits']['hits']:
+                relevant_doc_ids.append(r['_id'])
 
     return relevant_doc_ids
 
@@ -173,25 +194,35 @@ def sort_descending(relevant_docs, k):
 # outputs search results to a file
 # uses fields specific to ES builtin search
 # the ES builtin search already sorts the hits in decresing order, so there is no need to reorder before saving
-def save_to_file_for_es_builtin(relevant_docs, doc_name):
-    f = '/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/' + doc_name + '.txt'
+# updated for hw6 to support only qrel docs found
+def save_to_file_for_es_builtin(relevant_docs, doc_name, from_qrel=False):
+    f = '/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_' + doc_name + '.txt'
 
     if os.path.exists(f):
         os.remove(f)
 
     with open(f, 'w') as f:
-        for query_id, docs in relevant_docs.items():
-            count = 1
-            for d in docs['hits']['hits']:
-                f.write(str(query_id) + ' Q0 ' + str(d['_id']) + ' ' + str(count) + ' ' + str(d['_score']) + ' Exp\n')
-                count += 1
+
+        if from_qrel:
+            for query_id, docs in relevant_docs.items():
+                count = 1
+                for d, doc in docs.items():
+                    f.write(str(query_id) + ' Q0 ' + str(d) + ' ' + str(count) + ' ' + str(doc["hits"]["hits"][0]["_score"]) + ' Exp\n')
+                    count += 1
+
+        else:
+            for query_id, docs in relevant_docs.items():
+                count = 1
+                for d in docs['hits']['hits']:
+                    f.write(str(query_id) + ' Q0 ' + str(d['_id']) + ' ' + str(count) + ' ' + str(d['_score']) + ' Exp\n')
+                    count += 1
 
     f.close()
 
 # saves a list of scored docs to a .txt file
 # @param 2-d dictionary of scored documents [query][documents]
 def save_to_file(relevant_docs, filename):
-    f = '/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/' + filename + '.txt'
+    f = '/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_' + filename + '.txt'
     k = SIZE  # want to save the top 1000 files
 
     if os.path.exists(f):
@@ -212,18 +243,44 @@ def save_to_file(relevant_docs, filename):
 
 # uses built-in elasticsearch method to rank documents
 # @param given dictionary of queries
-def es_search(queries):
+# REVISED FOR HW 6 TO SEARCH FOR QREL DOCS
+def es_search(queries, from_qrel=False):
     relevant_docs = {}
 
-    for id, query in queries.items():  # query_list stores (id, query) key value pairs
-        body = {
-            "size": SIZE,
-            "query": {
-                "match": {"text": " ".join(query)}  # convert query array back into string
+    if from_qrel:
+        for id, query in queries.items():  # query_list stores (id, query) key value pairs
+            docs = query_search(id, query, from_qrel=True)
+
+            relevant_docs[id] = {}
+
+            for d in docs :
+                body = {
+                    "size": SIZE,
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"match": {"_id": d}}
+                            ],
+                            "should": [
+                                {"match": {"text": " ".join(query)}}
+                            ]
+                        }
+                    }
+                }
+
+                res_es_search = es.search(index=AP89_INDEX, body=body)
+                relevant_docs[id][d] = res_es_search
+
+    else:
+        for id, query in queries.items():  # query_list stores (id, query) key value pairs
+            body = {
+                "size": SIZE,
+                "query": {
+                    "match": {"text": " ".join(query)}  # convert query array back into string
+                }
             }
-        }
-        res_es_search = es.search(index=AP89_INDEX, body=body)
-        relevant_docs[id] = res_es_search
+            res_es_search = es.search(index=AP89_INDEX, body=body)
+            relevant_docs[id] = res_es_search
 
     return relevant_docs
 
@@ -320,7 +377,9 @@ def Vector_Prob_Models(queries):
         okapi_bm25_scores[q_id] = {}
 
         # get relevant documents for the query
-        doc_ids = query_search(query)
+        # doc_ids = query_search(id, query)
+        doc_ids = query_search(id, query, from_qrel=True)
+        sys.exit()
 
         d = get_total_docs()
         v = get_vocab_size()
@@ -333,33 +392,34 @@ def Vector_Prob_Models(queries):
                 d_id = tv['_id']
 
                 # only calculate score if the term is in the document
-                if term in tv["term_vectors"]["text"]["terms"].keys():
-                    tf_wq = get_word_in_query_frequency(term, query)
-                    tf_wd = get_word_in_doc_frequency(term, tv)
-                    dl = get_doc_length(d_id, term)
-                    adl = get_avg_doc_length(tv)
-                    df_w = get_doc_frequency_of_word(tv, term)
+            if term in tv["term_vectors"]["text"]["terms"].keys():
+                tf_wq = get_word_in_query_frequency(term, query)
+                tf_wd = get_word_in_doc_frequency(term, tv)
+                dl = get_doc_length(d_id, term)
+                adl = get_avg_doc_length(tv)
+                df_w = get_doc_frequency_of_word(tv, term)
 
-                    # okapi-tf
-                    okapi_score = okapi_tf(tf_wd, dl, adl)
-                    try:
-                        okapi_scores[q_id][d_id] += okapi_score
-                    except (KeyError):
-                        okapi_scores[q_id][d_id] = okapi_score
+                # okapi-tf
+                okapi_score = okapi_tf(tf_wd, dl, adl)
+                try:
+                    okapi_scores[q_id][d_id] += okapi_score
+                except (KeyError):
+                    okapi_scores[q_id][d_id] = okapi_score
 
-                    # TF-IDF
-                    tf_idf_score = tf_idf(okapi_score, d, df_w)
-                    try:
-                        tf_idf_scores[q_id][d_id] += tf_idf_score
-                    except (KeyError):
-                        tf_idf_scores[q_id][d_id] = tf_idf_score
+                # TF-IDF
+                tf_idf_score = tf_idf(okapi_score, d, df_w)
+                try:
+                    tf_idf_scores[q_id][d_id] += tf_idf_score
+                except (KeyError):
+                    tf_idf_scores[q_id][d_id] = tf_idf_score
 
-                    # Okapi BM25
-                    okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
-                    try:
-                        okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
-                    except (KeyError):
-                        okapi_bm25_scores[q_id][d_id] = okapi_bm25_score
+                # Okapi BM25
+                okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
+                try:
+                    okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
+                except (KeyError):
+                    okapi_bm25_scores[q_id][d_id] = okapi_bm25_score
+
 
     return okapi_scores, tf_idf_scores, okapi_bm25_scores
 
@@ -379,7 +439,7 @@ def Unigram_Models(queries):
         jm_scores[q_id] = {}
 
         # get relevant documents for the query
-        doc_ids = query_search(query)
+        doc_ids = query_search(id, query, from_qrel=True)
 
         d = get_total_docs()
         v = get_vocab_size()
@@ -417,7 +477,7 @@ def Unigram_Models(queries):
 # different ranking models
 def run_all_models():
     # process, stem, remove stop words from queries
-    queries = process_all_queries(q_data)
+    queries = process_all_queries()
     print(queries)
 
     # vector / prob models
@@ -431,12 +491,15 @@ def run_all_models():
 
     save_to_file(okapi_bm25_scores, "okapi_bm25")
     print("saved okapi bm25 scores")
-
-    # ES builtin:
-    es_builtin_scores = es_search(queries)
-
-    save_to_file_for_es_builtin(es_builtin_scores, "es_builtin")
-    print("saved built in scores")
+    #
+    # # ES builtin:
+    # # es_builtin_scores = es_search(queries)
+    # es_builtin_scores = es_search(queries, from_qrel=True)
+    #
+    # # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=False)
+    # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=True)
+    #
+    # print("saved built in scores")
 
     # language models
 
@@ -453,5 +516,4 @@ def run_all_models():
 
 if __name__ == '__main__':
     run_all_models()
-
 
