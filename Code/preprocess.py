@@ -1,3 +1,5 @@
+import csv
+
 import pandas as pd
 from sklearn.preprocessing import RobustScaler
 import query_execution
@@ -20,8 +22,7 @@ class preprocess:
         self.jm_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/uni_lm_jm.txt",
                                             "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_uni_lm_jm.txt")
         # dictionary of  { qid : { {relevant : {doc: {features}} } , {nonrelevant: {doc: {features}} } } }
-        self.data_set = self.complete_data_set()
-        self.update_features()
+        self.init_feature_table()
         self.n_dataframe = self.init_and_normalize_dataframe()
 
     # merge qrel scores and es search scores into one master dict to pull from for features
@@ -91,29 +92,38 @@ class preprocess:
         return dataset
 
 
-    def update_features(self):
-        for qid, docs in self.data_set.items():
-            r_nr = ["relevant", "nonrelvant"]
-            for r in r_nr: # iterate over relevant and nonrelevant docs
-                for doc, features in docs[r].items(): # update features
-                    print(doc, qid)
-                    f_dict = {"es": self.es_scores[qid][doc],
-                              "okapi" : self.okapi_scores[qid][doc],
-                              "tf" : self.tf_idf_scores[qid][doc],
-                              "bm25": self.bm25_scores[qid][doc],
-                              "lp": self.laplace_scores[qid][doc],
-                              "jm": self.jm_scores[qid][doc]}
-                    self.data_set[qid][r][doc].update(f_dict)
+    def init_feature_table(self):
+        dataset = self.complete_data_set()
+
+        with open("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", 'w', newline='') as opened:
+            writer = csv.writer(opened)
+            writer.writerow(["q:doc_id", "es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"])
+
+            for qid, docs in dataset.items():
+                r_nr = ["relevant", "nonrelevant"]
+                for r in r_nr: # iterate over relevant and nonrelevant docs
+                    if r == "relevant":
+                        rel = 1
+                    else:
+                        rel = 0
+
+                    for doc, features in docs[r].items(): # update features
+                        writer.writerow([str(qid) + ":" + doc,
+                                         self.es_scores[qid][doc],
+                                         self.okapi_scores[qid][doc],
+                                         self.tf_idf_scores[qid][doc],
+                                         self.bm25_scores[qid][doc],
+                                         self.laplace_scores[qid][doc],
+                                         self.jm_scores[qid][doc],
+                                         rel])
+
+        opened.close()
 
 
     def init_and_normalize_dataframe(self):
-        for q in self.data_set.keys():
-            self.data_set[q] = self.data_set[q]['relevant'].update(self.data_set[q]['nonrelevant'])
-
-        df = pd.DataFrame.from_dict(self.data_set)
-        print(df.head())
+        df = pd.read_csv("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", index_col=0)
         rs = RobustScaler()
-        columns = ["es", "okapi", "tf", "bm25", "lp", "jm"]
+        columns = ["es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"]
         df[columns] = rs.fit_transform(df[columns])
 
         return df

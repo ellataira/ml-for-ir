@@ -7,7 +7,7 @@ from nltk.stem.porter import *
 from elasticsearch7 import Elasticsearch
 
 es = Elasticsearch("http://localhost:9200")
-AP89_INDEX = 'ap89_index'
+AP89_INDEX = 'ap89_index_v2'
 q_data = "/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/new_queries.txt"
 
 VOCAB_SIZE = 288141
@@ -235,8 +235,8 @@ def save_to_file(relevant_docs, filename):
             sorted_dict = sort_descending(results_dict, k)
             count = 1
             for d_id, score in sorted_dict:
-                if d_id == "AP890327-0078":
-                    print("YES", query_id)
+                if d_id == "AP890729-0025":
+                    print("YES", query_id,"AP890729-0025")
                 f.write(str(query_id) + ' Q0 ' + str(d_id) + ' ' + str(count) + ' ' + str(score) + ' Exp\n')
                 count += 1
 
@@ -384,55 +384,46 @@ def Vector_Prob_Models(queries):
         # doc_ids = query_search(id, query)
         doc_ids = query_search(id, query, from_qrel=True)
 
-        if "AP890327-0078" in doc_ids:
+        if "AP890729-0025" in doc_ids:
             print("found in docids in vector model", q_id)
 
         d = get_total_docs()
         v = get_vocab_size()
 
         for d_id in doc_ids:
-            if d_id == "AP890327-0078":
+            if d_id == "AP890729-0025":
                 print("HERE", q_id)
+
+            okapi_scores[q_id][d_id] = 0
+            tf_idf_scores[q_id][d_id] = 0
+            okapi_bm25_scores[q_id][d_id] = 0
 
             tv = get_term_vector(d_id)
 
             # for each term in query,
             for term in query:
-                d_id = tv['_id']
+                # d_id = tv['_id']
 
                 # only calculate score if the term is in the document
-                try:
-                    if term in tv["term_vectors"]["text"]["terms"].keys():
-                        tf_wq = get_word_in_query_frequency(term, query)
-                        tf_wd = get_word_in_doc_frequency(term, tv)
-                        dl = get_doc_length(d_id, term)
-                        adl = get_avg_doc_length(tv)
-                        df_w = get_doc_frequency_of_word(tv, term)
+                if term in tv["term_vectors"]["text"]["terms"].keys():
+                    tf_wq = get_word_in_query_frequency(term, query)
+                    tf_wd = get_word_in_doc_frequency(term, tv)
+                    dl = get_doc_length(d_id, term)
+                    adl = get_avg_doc_length(tv)
+                    df_w = get_doc_frequency_of_word(tv, term)
 
-                        # okapi-tf
-                        okapi_score = okapi_tf(tf_wd, dl, adl)
-                        try:
-                            okapi_scores[q_id][d_id] += okapi_score
-                        except (KeyError):
-                            okapi_scores[q_id][d_id] = okapi_score
+                    # okapi-tf
+                    okapi_score = okapi_tf(tf_wd, dl, adl)
+                    okapi_scores[q_id][d_id] += okapi_score
 
-                        # TF-IDF
-                        tf_idf_score = tf_idf(okapi_score, d, df_w)
-                        try:
-                            tf_idf_scores[q_id][d_id] += tf_idf_score
-                        except (KeyError):
-                            tf_idf_scores[q_id][d_id] = tf_idf_score
 
-                        # Okapi BM25
-                        okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
-                        try:
-                            okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
-                        except (KeyError):
-                            okapi_bm25_scores[q_id][d_id] = okapi_bm25_score
-                except:
-                    okapi_scores[q_id][d_id] = 0
-                    tf_idf_scores[q_id][d_id] = 0
-                    okapi_bm25_scores[q_id][d_id] = 0
+                    # TF-IDF
+                    tf_idf_score = tf_idf(okapi_score, d, df_w)
+                    tf_idf_scores[q_id][d_id] += tf_idf_score
+
+                    # Okapi BM25
+                    okapi_bm25_score = okapi_bm25(tf_wq, tf_wd, df_w, adl, dl, d)
+                    okapi_bm25_scores[q_id][d_id] += okapi_bm25_score
 
     return okapi_scores, tf_idf_scores, okapi_bm25_scores
 
@@ -495,6 +486,8 @@ def run_all_models():
 
     # vector / prob models
     okapi_scores, tf_idf_scores, okapi_bm25_scores = Vector_Prob_Models(queries)
+
+    print(okapi_scores['54'])
 
     save_to_file(okapi_scores, "okapi_tf")
     print("saved okapi scores")
