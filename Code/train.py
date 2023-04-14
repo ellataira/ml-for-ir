@@ -60,7 +60,7 @@ class ML:
         lr = LogisticRegression(max_iter=1000, solver='liblinear', C=0.01, penalty='l1')
         lr.fit(x_train, y_train)
 
-        res = lr.predict_proba(x_test)[:,1] # TODO WHAT DOES IT MEAN THAT THESE ARE ALL THE SAME VLAUES
+        res = lr.predict_proba(x_test)[:,1] # [:,1] to only prob of being 1 # TODO WHAT DOES IT MEAN THAT THESE ARE ALL THE SAME VLAUES--  but that only happens sometimes
         print(res)
 
 
