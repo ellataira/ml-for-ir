@@ -23,9 +23,6 @@ def get_qrel_docs(query_id, qrel="/Users/ellataira/Desktop/is4200/homework--6-el
             split_line = line.split()
             qID, docID, score = int(split_line[0]), split_line[2], float(split_line[3])
 
-            if docID == "AP890327-0078":
-                print("found in get_qrel_docs", query_id)
-
             if qID == int(query_id):
                 docs.append(docID.decode())
     opened.close()
@@ -235,8 +232,6 @@ def save_to_file(relevant_docs, filename):
             sorted_dict = sort_descending(results_dict, k)
             count = 1
             for d_id, score in sorted_dict:
-                if d_id == "AP890729-0025":
-                    print("YES", query_id,"AP890729-0025")
                 f.write(str(query_id) + ' Q0 ' + str(d_id) + ' ' + str(count) + ' ' + str(score) + ' Exp\n')
                 count += 1
 
@@ -384,15 +379,11 @@ def Vector_Prob_Models(queries):
         # doc_ids = query_search(id, query)
         doc_ids = query_search(id, query, from_qrel=True)
 
-        if "AP890729-0025" in doc_ids:
-            print("found in docids in vector model", q_id)
-
         d = get_total_docs()
         v = get_vocab_size()
 
         for d_id in doc_ids:
-            if d_id == "AP890729-0025":
-                print("HERE", q_id)
+
 
             okapi_scores[q_id][d_id] = 0
             tf_idf_scores[q_id][d_id] = 0
@@ -498,14 +489,14 @@ def run_all_models():
     save_to_file(okapi_bm25_scores, "okapi_bm25")
     print("saved okapi bm25 scores")
 
-    # # ES builtin:
-    # # es_builtin_scores = es_search(queries)
-    # es_builtin_scores = es_search(queries, from_qrel=True)
-    #
-    # # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=False)
-    # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=True)
-    #
-    # print("saved built in scores")
+    # ES builtin:
+    # es_builtin_scores = es_search(queries)
+    es_builtin_scores = es_search(queries, from_qrel=True)
+
+    # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=False)
+    save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=True)
+
+    print("saved built in scores")
 
     # language models
 
