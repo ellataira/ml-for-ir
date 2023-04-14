@@ -7,7 +7,7 @@ import query_execution
 from preprocess import preprocess
 
 SIZE = 1000 # save the top 1000 docs
-class ML:
+class Model:
 
     def __init__(self, dataframe=None):
         self.dataframe = dataframe
@@ -15,7 +15,8 @@ class ML:
                                                                           "homework--6-ellataira/data/new_queries.txt")
         self.tested_queries = []
 
-    def get_train_test_queries(self): # TODO is it ok that some queries are trained on multiple times? i feel like no...
+    # get 20 training queries and 5 testing queries, ensuring that no query is tested on twice
+    def get_train_test_queries(self):
         test_pool = list(self.queries.keys()) # only need query numbers, not contents
 
         for q in self.tested_queries: # update pool of queries to be tested (aka set of 5)
@@ -28,6 +29,7 @@ class ML:
 
         return test, list(train)
 
+    # given a set of queries, return the dataframe of the queries' documents
     def get_partial_dataset(self, queries):
         frames = []
 
@@ -38,6 +40,7 @@ class ML:
         df_res = pd.concat(frames)
         return df_res
 
+    # uses a logistic regression model to train and test on 25 documents
     def train(self):
         # iterate to train and test on all queries (cross-validation)
         for i in range(5):
@@ -59,25 +62,20 @@ class ML:
             x_train, y_train, x_test, y_test = train_df.iloc[:,:-1], train_df.iloc[:,-1], \
                                                test_df.iloc[:,:-1], test_df.iloc[:,-1]
 
-            # print(x_train)
-            # print(y_train)
-            # print(x_test)
-            # print(y_test)
-
-
             # 1. train model on training set
             lr = LogisticRegression(max_iter=1000, solver='liblinear', C=0.01, penalty='l1')
             lr.fit(x_train, y_train)
 
-            # score test set using trained model and save results
+            # 2. score test set using trained model and save results
             test_res = lr.predict_proba(x_test)[:, 1] # [:,1] to only prob of being 1 # TODO WHAT DOES IT MEAN THAT THESE ARE ALL THE SAME VLAUES--  but that only happens sometimes
             self.write_result(test_res, i, test_df, "x_test_res")
 
-            # score training set using trained model and save results
+            # 3. score training set using trained model and save results
             train_res = lr.predict_proba(x_train)[:,1]
             self.write_result(train_res, i, train_df, "x_train_res")
 
 
+    # save sorted model results to txt file
     def write_result(self, probs, iter, test_df, filename):
         # need to sort probabilities by query in descending order while maintaining prob:data pairs
         sorted_list = {} # maps qid : [ (docid , prob) ]
@@ -108,10 +106,5 @@ class ML:
 
 if __name__ == "__main__" :
     p = preprocess()
-    ml = ML(p.n_dataframe)
+    ml = Model(p.n_dataframe)
     ml.train()
-
-    # print(df.head())
-    #
-    # for i in range(5):
-    #     print(ml.get_train_test_queries())

@@ -91,7 +91,7 @@ class preprocess:
 
         return dataset
 
-
+    # creates csv file containing all query:document instances and their feature scores
     def init_feature_table(self):
         dataset = self.complete_data_set()
 
@@ -119,7 +119,7 @@ class preprocess:
 
         opened.close()
 
-
+    # initializes csv matrix to a dataframe and normalizes scores
     def init_and_normalize_dataframe(self):
         df = pd.read_csv("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", index_col=0)
         rs = RobustScaler()
