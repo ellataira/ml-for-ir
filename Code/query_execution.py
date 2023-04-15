@@ -77,7 +77,7 @@ def query_search(id, query, from_qrel=False):
         res = es.search(
             index=AP89_INDEX,
             body={
-                "size": 2000,
+                "size": 10000,
                 "query": {
                     "match": {"text": " ".join(query)}  # convert query array back into string
                 }

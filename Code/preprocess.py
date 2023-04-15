@@ -89,6 +89,12 @@ class preprocess:
             for doc, score in self.es_scores[qid].items():
                 if len(nonrel) < 1000 :
                     nonrel.add(doc)
+
+            if len(nonrel) < 1000: # if still don't have enough docs, add some more irrelevant docs
+                for doc, score in self.es_scores[59].items():
+                    if len(nonrel) < 1000:
+                        nonrel.add(doc)
+
             sum_exp_nonrel += len(nonrel)
 
             dataset[qid]["nonrelevant"] = nonrel
@@ -97,6 +103,7 @@ class preprocess:
 
         print(sum_rel, sum_nonrel, sum_exp_nonrel)
         return dataset
+
 
     # creates csv file containing all query:document instances and their feature scores
     def init_feature_table(self):
@@ -131,38 +138,33 @@ class preprocess:
         opened.close()
         print(c)
 
+
     # try to access score of given qid:doc, or give score of 0
     def try_get_scores(self,qid, doc):
         # if key error, then irrelevant => == 0
         try:
             es = self.es_scores[qid][doc]
         except:
-            print("uhoh es")
             es = 0
         try:
             ok = self.okapi_scores[qid][doc]
         except:
-            print("uhoh okapi")
             ok = 0
         try:
             tf = self.tf_idf_scores[qid][doc]
         except:
-            print("uhoh tf")
             tf = 0
         try:
             bm = self.bm25_scores[qid][doc]
         except:
-            print("uhoh bm")
             bm = 0
         try:
             l = self.laplace_scores[qid][doc]
         except:
-            print("uhoh l ")
             l = 0
         try:
             jm = self.jm_scores[qid][doc]
         except:
-            print("uhoh jm")
             jm = 0
 
         return es, ok, tf, bm, l, jm
@@ -172,7 +174,7 @@ class preprocess:
     def init_and_normalize_dataframe(self):
         df = pd.read_csv("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", index_col=0)
         rs = RobustScaler()
-        columns = ["es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"]
+        columns = ["es", "okapi-tf", "tf-idf", "okapi-bm25", "laplace", "jm", "label"]
         df[columns] = rs.fit_transform(df[columns])
 
         return df

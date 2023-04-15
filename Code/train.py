@@ -94,7 +94,7 @@ class Model:
 
         # write to file
         with open("/Users/ellataira/Desktop/is4200/homework--6-ellataira"
-                  "/Results/" + filename + str(iter)+ "_new.txt", "w") as opened:
+                  "/Results/0" + filename + str(iter)+ ".txt", "w") as opened:
             for qid, docs in sorted_list.items():
                 count = 1
                 for docid, prob in docs:
