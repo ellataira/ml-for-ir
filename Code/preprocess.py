@@ -9,13 +9,13 @@ class preprocess:
     def __init__(self):
         self.qrel_dict = {}
         self.read_qrel("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/qrels.adhoc.51-100.AP89.txt")
-        self.es_scores = self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/9.52_es_builtin.txt",
+        self.es_scores = self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/es_builtin.txt",
                                            "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_es_builtin.txt")
-        self.okapi_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/9.52_okapi_tf.txt",
+        self.okapi_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/okapi_tf.txt",
                                                "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_okapi_tf.txt")
-        self.tf_idf_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/9.52_tf_idf.txt",
+        self.tf_idf_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/tf_idf.txt",
                                                 "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_tf_idf.txt")
-        self.bm25_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/9.52_okapi_bm25.txt",
+        self.bm25_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/okapi_bm25.txt",
                                               "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_okapi_bm25.txt")
         self.laplace_scores =  self.merge_scores("/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/uni_lm_laplace.txt",
                                                  "/Users/ellataira/Desktop/is4200/homework--6-ellataira/Results/qrel_uni_lm_laplace.txt")
@@ -73,10 +73,15 @@ class preprocess:
     # completes dataset so there are 1000 nonrelevant docs
     def complete_data_set(self):
         dataset = {}
+        sum_rel = 0
+        sum_nonrel= 0
+        sum_exp_nonrel = 0
 
         for qid, docs in self.qrel_dict.items():
             rel = docs["relevant"]
+            sum_rel += len(rel)
             nonrel = docs["nonrelevant"]
+            sum_nonrel += len(nonrel)
 
             dataset[qid] = {}
             dataset[qid]["relevant"] = rel
@@ -84,14 +89,13 @@ class preprocess:
             for doc, score in self.es_scores[qid].items():
                 if len(nonrel) < 1000 :
                     nonrel.add(doc)
-
-            # if len(nonrel) < 1000:
-            #     for doc, score in self.es_scores[85].items():
-            #         if len(nonrel) < 1000:
-            #             nonrel.add(doc)
+            sum_exp_nonrel += len(nonrel)
 
             dataset[qid]["nonrelevant"] = nonrel
 
+            print(len(rel), len(nonrel))
+
+        print(sum_rel, sum_nonrel, sum_exp_nonrel)
         return dataset
 
     # creates csv file containing all query:document instances and their feature scores
@@ -101,7 +105,7 @@ class preprocess:
         with open("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", 'w', newline='') as opened:
             writer = csv.writer(opened)
             writer.writerow(["q:doc_id", "es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"])
-
+            c = 0
             for qid, docs in dataset.items():
                 r_nr = ["relevant", "nonrelevant"]
                 for r in r_nr: # iterate over relevant and nonrelevant docs
@@ -122,8 +126,10 @@ class preprocess:
                                          l,
                                          jm,
                                          rel])
+                        c += 1
 
         opened.close()
+        print(c)
 
     # try to access score of given qid:doc, or give score of 0
     def try_get_scores(self,qid, doc):
@@ -131,26 +137,32 @@ class preprocess:
         try:
             es = self.es_scores[qid][doc]
         except:
+            print("uhoh es")
             es = 0
         try:
             ok = self.okapi_scores[qid][doc]
         except:
+            print("uhoh okapi")
             ok = 0
         try:
             tf = self.tf_idf_scores[qid][doc]
         except:
+            print("uhoh tf")
             tf = 0
         try:
             bm = self.bm25_scores[qid][doc]
         except:
+            print("uhoh bm")
             bm = 0
         try:
             l = self.laplace_scores[qid][doc]
         except:
+            print("uhoh l ")
             l = 0
         try:
             jm = self.jm_scores[qid][doc]
         except:
+            print("uhoh jm")
             jm = 0
 
         return es, ok, tf, bm, l, jm
