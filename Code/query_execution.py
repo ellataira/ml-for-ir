@@ -77,7 +77,7 @@ def query_search(id, query, from_qrel=False):
         res = es.search(
             index=AP89_INDEX,
             body={
-                "size": 10000,
+                "size": 2000,
                 "query": {
                     "match": {"text": " ".join(query)}  # convert query array back into string
                 }
@@ -376,8 +376,8 @@ def Vector_Prob_Models(queries):
         okapi_bm25_scores[q_id] = {}
 
         # get relevant documents for the query
-        # doc_ids = query_search(id, query)
-        doc_ids = query_search(id, query, from_qrel=True)
+        doc_ids = query_search(id, query)
+        # doc_ids = query_search(id, query, from_qrel=True)
 
         d = get_total_docs()
         v = get_vocab_size()
@@ -434,7 +434,9 @@ def Unigram_Models(queries):
         jm_scores[q_id] = {}
 
         # get relevant documents for the query
-        doc_ids = query_search(id, query, from_qrel=True)
+        # doc_ids = query_search(id, query, from_qrel=True)
+        doc_ids = query_search(id, query)
+
 
         d = get_total_docs()
         v = get_vocab_size()
@@ -478,8 +480,6 @@ def run_all_models():
     # vector / prob models
     okapi_scores, tf_idf_scores, okapi_bm25_scores = Vector_Prob_Models(queries)
 
-    print(okapi_scores['54'])
-
     save_to_file(okapi_scores, "okapi_tf")
     print("saved okapi scores")
 
@@ -490,11 +490,11 @@ def run_all_models():
     print("saved okapi bm25 scores")
 
     # ES builtin:
-    # es_builtin_scores = es_search(queries)
-    es_builtin_scores = es_search(queries, from_qrel=True)
+    es_builtin_scores = es_search(queries)
+    # es_builtin_scores = es_search(queries, from_qrel=True)
 
-    # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=False)
-    save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=True)
+    save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=False)
+    # save_to_file_for_es_builtin(es_builtin_scores, "es_builtin", from_qrel=True)
 
     print("saved built in scores")
 
@@ -513,4 +513,3 @@ def run_all_models():
 
 if __name__ == '__main__':
     run_all_models()
-

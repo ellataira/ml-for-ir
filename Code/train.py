@@ -67,7 +67,7 @@ class Model:
             lr.fit(x_train, y_train)
 
             # 2. score test set using trained model and save results
-            test_res = lr.predict_proba(x_test)[:, 1] # [:,1] to only prob of being 1 # TODO WHAT DOES IT MEAN THAT THESE ARE ALL THE SAME VLAUES--  but that only happens sometimes
+            test_res = lr.predict_proba(x_test)[:, 1] # [:,1] to only prob of being 1
             self.write_result(test_res, i, test_df, "x_test_res")
 
             # 3. score training set using trained model and save results
@@ -94,7 +94,7 @@ class Model:
 
         # write to file
         with open("/Users/ellataira/Desktop/is4200/homework--6-ellataira"
-                  "/Results/" + filename + str(iter)+ ".txt", "w") as opened:
+                  "/Results/" + filename + str(iter)+ "_new.txt", "w") as opened:
             for qid, docs in sorted_list.items():
                 count = 1
                 for docid, prob in docs:
