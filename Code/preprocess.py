@@ -29,10 +29,12 @@ class preprocess:
     def merge_scores(self, search_res, qrel_res):
         d1 = self.read_scores(search_res)
         d2 = self.read_scores(qrel_res)
+        res = {}
+        for q, d in d1.items():
+            merged = {**d1[q], **d2[q]}
+            res[q] = merged
 
-        d1.update(d2)
-
-        return d1
+        return res
 
     # reads given qrel file to create dictionary that maps query id to its relevant and nonrelevant documents
     def read_qrel(self, filename):
@@ -44,12 +46,12 @@ class preprocess:
                 if str(qID) in qs: # only include 25 queries from qrel
                     if qID not in self.qrel_dict.keys(): # add query to dict if not present
                         self.qrel_dict[qID] = {}
-                        self.qrel_dict[qID]["relevant"] = {}
-                        self.qrel_dict[qID]["nonrelevant"] = {}
+                        self.qrel_dict[qID]["relevant"] = set()
+                        self.qrel_dict[qID]["nonrelevant"] = set()
                     if score == 0:
-                        self.qrel_dict[qID]["nonrelevant"][docID] = {} # the empty dictionary will later contain the doc's features
+                        self.qrel_dict[qID]["nonrelevant"].add(docID)# the empty dictionary will later contain the doc's features
                     else:
-                        self.qrel_dict[qID]["relevant"][docID] = {}
+                        self.qrel_dict[qID]["relevant"].add(docID)
         opened.close()
 
     # reads score output file of 2000 docs into dictionary
@@ -71,25 +73,37 @@ class preprocess:
     # completes dataset so there are 1000 nonrelevant docs
     def complete_data_set(self):
         dataset = {}
+        sum_rel = 0
+        sum_nonrel= 0
+        sum_exp_nonrel = 0
 
         for qid, docs in self.qrel_dict.items():
             rel = docs["relevant"]
+            sum_rel += len(rel)
             nonrel = docs["nonrelevant"]
+            sum_nonrel += len(nonrel)
 
             dataset[qid] = {}
             dataset[qid]["relevant"] = rel
 
             for doc, score in self.es_scores[qid].items():
                 if len(nonrel) < 1000 :
-                    if doc not in rel and doc not in nonrel:
-                        nonrel[doc] = {}
-                else:
-                    break
+                    nonrel.add(doc)
+
+            if len(nonrel) < 1000: # if still don't have enough docs, add some more irrelevant docs
+                for doc, score in self.es_scores[59].items():
+                    if len(nonrel) < 1000:
+                        nonrel.add(doc)
+
+            sum_exp_nonrel += len(nonrel)
 
             dataset[qid]["nonrelevant"] = nonrel
 
+            print(len(rel), len(nonrel))
 
+        print(sum_rel, sum_nonrel, sum_exp_nonrel)
         return dataset
+
 
     # creates csv file containing all query:document instances and their feature scores
     def init_feature_table(self):
@@ -98,7 +112,7 @@ class preprocess:
         with open("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", 'w', newline='') as opened:
             writer = csv.writer(opened)
             writer.writerow(["q:doc_id", "es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"])
-
+            c = 0
             for qid, docs in dataset.items():
                 r_nr = ["relevant", "nonrelevant"]
                 for r in r_nr: # iterate over relevant and nonrelevant docs
@@ -107,23 +121,60 @@ class preprocess:
                     else:
                         rel = 0
 
-                    for doc, features in docs[r].items(): # update features
+                    for doc in list(docs[r]): # update features
+
+                        es, ok, tf, bm, l, jm = self.try_get_scores(qid,doc)
+
                         writer.writerow([str(qid) + ":" + doc,
-                                         self.es_scores[qid][doc],
-                                         self.okapi_scores[qid][doc],
-                                         self.tf_idf_scores[qid][doc],
-                                         self.bm25_scores[qid][doc],
-                                         self.laplace_scores[qid][doc],
-                                         self.jm_scores[qid][doc],
+                                         es,
+                                         ok,
+                                         tf,
+                                         bm,
+                                         l,
+                                         jm,
                                          rel])
+                        c += 1
 
         opened.close()
+        print(c)
+
+
+    # try to access score of given qid:doc, or give score of 0
+    def try_get_scores(self,qid, doc):
+        # if key error, then irrelevant => == 0
+        try:
+            es = self.es_scores[qid][doc]
+        except:
+            es = 0
+        try:
+            ok = self.okapi_scores[qid][doc]
+        except:
+            ok = 0
+        try:
+            tf = self.tf_idf_scores[qid][doc]
+        except:
+            tf = 0
+        try:
+            bm = self.bm25_scores[qid][doc]
+        except:
+            bm = 0
+        try:
+            l = self.laplace_scores[qid][doc]
+        except:
+            l = 0
+        try:
+            jm = self.jm_scores[qid][doc]
+        except:
+            jm = 0
+
+        return es, ok, tf, bm, l, jm
+
 
     # initializes csv matrix to a dataframe and normalizes scores
     def init_and_normalize_dataframe(self):
         df = pd.read_csv("/Users/ellataira/Desktop/is4200/homework--6-ellataira/data/docs.csv", index_col=0)
         rs = RobustScaler()
-        columns = ["es", "okapi-tf", "tf-idf", "okapi-bm25","laplace", "jm", "label"]
+        columns = ["es", "okapi-tf", "tf-idf", "okapi-bm25", "laplace", "jm", "label"]
         df[columns] = rs.fit_transform(df[columns])
 
         return df
